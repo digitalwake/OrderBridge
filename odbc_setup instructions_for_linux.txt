@@ -1,0 +1,87 @@
+Finally after several days of research and googled, I can connect my database (AS/400, DB2 V6.1) with ODBC, in UBUNTU 9.10, and a program in Lazarus
+
+Here are the instructions...
+
+1. Install IBM as400 client Access
+sudo apt-get install alien libmotif3
+cp /home/administrator/iSeriesAccess-6.1.0-1.0.i386.rpm /root
+sudo alien -dckv iSeriesAccess-6.1.0-1.0.i386.rpm
+((run .deb package---  sudo dpkg -i iseriesaccess_6.1.0-1.0_i386.deb))
+
+
+2. Install Java 6 of SUN
+download jre-6u20-linux-i586.bin
+sudo -i
+cd /usr/local
+cp /home/administrator/jre-6u20-linux-i586.bin /usr/local
+chmod a+x jre-6u20-linux-i586.bin
+ls -l
+./jre-6u20-linux-i586.bin
+(page down until yes)
+cd /usr/lib/firefox-3.5.9/plugins
+ln -s /usr/local/jre1.6.0_20/plugin/i386/ns7/libjavaplugin_oji.so
+cd
+apt-get install sun-java6-jre
+
+
+
+3. Install UNIXODBC
+sudo apt-get install unixodbc-bin
+
+
+
+4. Copy the virtual link 
+cd /usr/lib
+sudo cp /usr/lib/jvm/java-6-sun-1.6.0.20/jre/lib/i386/libodbc.so .
+
+
+
+4. register your AS400
+sudo ODBCConfig
+
+# 32 bit entry using common driver name
+[iSeries Access ODBC Driver]
+Description = iSeries Access for Linux ODBC Driver
+Driver      = /opt/ibm/iSeriesAccess/lib/libcwbodbc.so
+Setup       = /opt/ibm/iSeriesAccess/lib/libcwbodbcs.so
+NOTE1= If using unixODBC 2.2.11 or later and you want the 32 and 64-bit ODBC drivers to share DSN's,
+NOTE2= the following Driver64/Setup64 keywords will provide that support.
+Driver64    = /opt/ibm/iSeriesAccess/lib64/libcwbodbc.so
+Setup64     = /opt/ibm/iSeriesAccess/lib64/libcwbodbcs.so
+Threading   = 2
+DontDLClose = 1
+
+(to verify instalation
+isql -v [replace with DSN Name]
+
+5. Sample in Lazarus for Ubuntu
+
+begin
+  conn  := TODBCConnection.Create(nil);
+  query := TSQLQuery.Create(nil);
+  transaction := TSQLTransaction.Create(nil);
+
+  conn.DatabaseName:='(Replace with DNS Name)';
+  conn.Driver:='(Replace with Driver)';
+  conn.Transaction:=transaction;
+
+  query.DataBase := conn;
+  query.SQL.Add('Select count(*) cuantos from pillib.tck');
+  query.Close;
+  query.open;
+  while not query.EOF do
+  Begin
+       s:=query.FieldByName('cuantos').AsString;
+       query.Next;
+  end;
+  query.Close;
+
+  Edit_Cuantos.Text:= s;
+
+end;   
+
+
+Enjoy it!!!!!!!
+
+Jorge
+

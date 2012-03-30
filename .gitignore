@@ -1,0 +1,7 @@
+.*~
+tmp
+tmp/*
+*.xml
+*.db
+*.sqlite
+*.sqlite3
