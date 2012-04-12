@@ -15,9 +15,11 @@ if session.login
 		puts "1.Get Advanced Orders for a Date Range"
 		puts "2.Process and 'Lock' Orders for a Specific Date"
 		print "Enter option:"
-		@function = case gets.chomp
-			when 1 then self.ProcessAdvanced
-			when 2 then self.ProcessCurrent
+		@function = gets.chomp
+			case @function
+			when "1" then self.processAdvanced
+			when "2" then self.processCurrent
+			end
 	else
 		puts "We're outta here"
 	end
@@ -25,13 +27,14 @@ else
 	puts "Login Failed - Quitting now."
 end
 
-def ProcessAdvance
+
+def processAdvance
 	puts "*- Advanced Orders -*"
-	puts "Enter FROM Date ( MMDDYYYY ):"
+	print "Enter FROM Date ( MMDDYYYY ):"
 	@start_date = gets.chomp
-	puts "Enter TO Date   ( MMDDYYYY ):"
+	print "Enter TO Date   ( MMDDYYYY ):"
 	@to_date = gets.chomp
-	puts "Enter Borough   ( (M/K/A(ll) ):"
+	print "Enter Borough   ( (M/K/A(ll) ):"
 	@boro = gets.chomp
 	puts "Advanced Orders: Processing From Date: To Date: for Borough:"
 	print "Continue? (Y/N):"
@@ -40,7 +43,7 @@ def ProcessAdvance
 		puts "Preparing Connections and Downloading Orders..."
 		session.prepare
 		puts "Processing Orders..."
-		session.process
+		session.processAdvancedOrders
 		puts "Closing Connections"
 		session.close
 		puts "Processing Complete"
@@ -49,11 +52,11 @@ def ProcessAdvance
 	end
 end
 
-def ProcessCurrent
+def processCurrent
 	puts "*- Current Orders -*"
-	puts "Enter Date   ( MMDDYYYY ):"
+	print "Enter Date   ( MMDDYYYY ):"
 	@start_date = gets.chomp
-	puts "Enter Borough   ( (M/K/A(ll) ):"
+	print "Enter Borough   ( (M/K/A(ll) ):"
 	@boro = gets.chomp
 	print "Continue? (Y/N):"
 	continue = gets.chomp.upcase
@@ -61,7 +64,7 @@ def ProcessCurrent
 		puts "Preparing Connections and Downloading Orders..."
 		session.prepare
 		puts "Processing Orders..."
-		session.process
+		session.processCurrentOrders
 		puts "Closing Connections"
 		session.close
 		puts "Processing Complete"

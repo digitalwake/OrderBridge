@@ -95,7 +95,7 @@ class OrderProcessor
 				
 	end
 	
-	def process
+	def processCurrentOrders
 		#iterate through the orders (elements marked "elements")
 		i=0
 		x=0
@@ -134,6 +134,10 @@ class OrderProcessor
 		@database_handle.disconnect
 		@db_local.disconnect
 		puts "#{@writer.orders} Orders Processed with a total of #{@writer.total_order_lines} order lines."
+	end
+	
+	def processAdvancedOrders
+		puts "OrderProcessor::processAdvancedOrders called"
 	end
 	
 private
