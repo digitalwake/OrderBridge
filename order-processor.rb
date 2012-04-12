@@ -6,7 +6,6 @@ require 'nokogiri'
 require './doe.rb'
 require './order-writer.rb'
 
-
 class OrderProcessor
 
 	def initialize
@@ -56,16 +55,127 @@ class OrderProcessor
 		return true
 	end
 	
-	def prepare
+	def processCurrentOrders
+		#Prepare for processing
+		#self.login
+		puts "*- Current Orders -*"
+		parms[:advanced] => 'N'
+		print "Enter Date    [MMDDYYYY]:"
+		parms[:date] => gets.chomp
+		print "Enter Borough ['M'/'K1'/'A'(ll)]:"
+		parms[:boro] => gets.chomp
+		print "Lock the Orders? (Y/N)"
+		parms[:locked] => case gets.chomp.upcase
+			when "Y" then 1
+			when "N" then 0
+			end
+			puts "Flag = #{flag}"
+		print "Continue? (Y/N):"
+		
+		continue = gets.chomp.upcase
+		if continue == "Y"
+			puts "Preparing Connections and Downloading Orders..."
+			self.prepare(parms[])
+			puts "Processing Orders..."
+			#self.processCurrentOrders
+			#iterate through the orders (elements marked "elements")
+			
+			i=0
+			x=0
+			@ns.each do |node| 
+				@purchase_order = node.at_xpath("order_id").content
+				@delivery_date = node.at_xpath("delivery_date").content
+				@ship_to = node.at_xpath("school_id").content.to_i
+				@cust_num = ((@ship_to/1000)*1000)+999
+				#puts "Mie #{@ship_to} converted to #{@mie}"
+				@special_instructions = node.at_xpath("special_instruction").content
+			
+				i += 1
+				#puts "Order id from node: #{node.name} is: #{@purchase_order}"
+				puts "Orders: #{i}" #indexing starts at zero
+				process_order_header @purchase_order, @cust_num, @ship_to, @delivery_date, @special_instructions
+
+				#iterate through the element details
+				node.children.each do |child|
+					#print child.name
+					x += 1
+					@spec_num = child['item_key']
+					@qty      = child['ordered_quantity']
+					process_order_detail @spec_num, @qty
+				end
+			end
+			
+				puts "Closing Connections"
+			self.close
+			puts "Processing Complete"
+		else
+			puts "We're outta here"
+		end
+		
+	end
 	
-		#Get the DOE Orders and save off to a file
+	def processAdvancedOrders
+		#login and prepare for processing
+		#self.login
+		#self.prepare
+		puts "*- Advanced Orders -*"
+		parms[:advanced] => 'Y'
+		print "Enter FROM Date [MMDDYYYY]:"
+		parms[:date] => gets.chomp
+		print "Enter TO Date   [MMDDYYYY]:"
+		parms[:end_date] => gets.chomp
+		print "Enter Borough   ['M'/'K1'/'A'(ll)]:"
+		parms[:boro] => gets.chomp
+		puts "Advanced Orders: Processing From Date: To Date: for Borough:"
+		print "Continue? (Y/N):"
+		continue = gets.chomp.upcase
+		if continue == "Y"
+			puts "Preparing Connections and Downloading Orders..."
+			self.prepare(parms[])
+			puts "Processing Orders..."
+			self.processAdvancedOrders
+			puts "Closing Connections"
+			self.close
+			puts "Processing Complete"
+		else
+			puts "We're outta here"
+		end
+		#puts "OrderProcessor::processAdvancedOrders called"
+	end
+	
+	def close
+		@cust_items.finish
+		@database_handle.disconnect
+		@db_local.disconnect
+		puts "#{@writer.orders} Orders Processed with a total of #{@writer.total_order_lines} order lines."
+	end
+	
+private
+
+	def prepare (parms[])
+	
 		doe_service = DoeOrders.new
 		doe_service.pass = @doe_pass
 		doe_service.user = @doe_user
-		@orders = doe_service.GetOrders()
+		doe_service.date => parms[:date]
 		
-		#Get XML orders from the Web Service File
-		doc = Nokogiri::XML(open("tmp/log.xml"))
+		If parms[:advanced]=='N'
+			#Get the DOE Orders and save off to a file
+			doe_service.boro => parms[:boro]
+			doe_service.locked_flag => parms[:locked]
+			@orders = doe_service.GetCurrentOrders
+		
+			#Get XML orders from the Web Service File
+			doc = Nokogiri::XML(open("tmp/current_log.xml"))
+			
+		else
+			doe_service.end_date => parms[:end_date]
+			doe_service.boro => parms[:boro]
+			@orders = doe_service.GetAdvancedOrders
+		
+			#Get XML orders from the Web Service File
+			doc = Nokogiri::XML(open("tmp/advanced_log.xml"))
+		end			
 
 		#A NodeSet of the child elements - The DOE WebService names the elements "elements"
 		@ns = doc.xpath("//elements")
@@ -94,53 +204,6 @@ class OrderProcessor
 		puts "Customer Item# result count is: #{@cust_items.result_count}"
 				
 	end
-	
-	def processCurrentOrders
-		#iterate through the orders (elements marked "elements")
-		i=0
-		x=0
-		@ns.each do |node| 
-			@purchase_order = node.at_xpath("order_id").content
-			@delivery_date = node.at_xpath("delivery_date").content
-			@ship_to = node.at_xpath("school_id").content.to_i
-			@cust_num = ((@ship_to/1000)*1000)+999
-			#puts "Mie #{@ship_to} converted to #{@mie}"
-			@special_instructions = node.at_xpath("special_instruction").content
-			
-			i += 1
-			#puts "Order id from node: #{node.name} is: #{@purchase_order}"
-			puts "Orders: #{i}" #indexing starts at zero
-			process_order_header @purchase_order, @cust_num, @ship_to, @delivery_date, @special_instructions
-
-			#iterate through the element details
-			node.children.each do |child|
-				#print child.name
-				x += 1
-				@spec_num = child['item_key']
-				@qty      = child['ordered_quantity']
-				process_order_detail @spec_num, @qty
-			end
-		end
-		#@orders[:order_id].each_key do |key_value_array|
-			#current_order = key_value_array[:order_id]
-			#puts "Current Order_Id is: #{current_order}"
-			#@orders_processed += 1
-		#end
-		#puts "Total Orders Processed = #{@orders_processed}"
-	end
-	
-	def close
-		@cust_items.finish
-		@database_handle.disconnect
-		@db_local.disconnect
-		puts "#{@writer.orders} Orders Processed with a total of #{@writer.total_order_lines} order lines."
-	end
-	
-	def processAdvancedOrders
-		puts "OrderProcessor::processAdvancedOrders called"
-	end
-	
-private
 	
 	def process_order_header(cust_po,cust,ship_to,delivery_date,sp_inst)
 		#stub
