@@ -51,6 +51,7 @@ class OrderProcessor
 			puts "success is FALSE" 
 			return false
 		end
+		
 		puts "Success is TRUE"
 		return true
 	end
@@ -58,24 +59,24 @@ class OrderProcessor
 	def processCurrentOrders
 		#Prepare for processing
 		#self.login
-		puts "*- Current Orders -*"
-		parms[:advanced] => 'N'
-		print "Enter Date    [MMDDYYYY]:"
-		parms[:date] => gets.chomp
+		puts "*-------- Current Orders --------*"
+		print "         Enter Date [MM/DD/YYYY]:"
+		parms = {:advanced => 'N', :date => gets.chomp}
 		print "Enter Borough ['M'/'K1'/'A'(ll)]:"
-		parms[:boro] => gets.chomp
-		print "Lock the Orders? (Y/N)"
-		parms[:locked] => case gets.chomp.upcase
-			when "Y" then 1
-			when "N" then 0
+		parms[:boro] = gets.chomp.upcase
+		#print "Lock the Orders? (Y/N)"
+		#parms[:locked] = case gets.chomp.upcase
+			#when "Y" then 1
+			##when "N" then 0
 			end
-			puts "Flag = #{flag}"
-		print "Continue? (Y/N):"
 		
+		#puts "Flag = #{parms[:locked]}"
+		print "**This will LOCK ALL the orders for this date.** Continue? (Y/N):"
 		continue = gets.chomp.upcase
+		
 		if continue == "Y"
 			puts "Preparing Connections and Downloading Orders..."
-			self.prepare(parms[])
+			self.prepare(parms)
 			puts "Processing Orders..."
 			#self.processCurrentOrders
 			#iterate through the orders (elements marked "elements")
@@ -105,35 +106,59 @@ class OrderProcessor
 				end
 			end
 			
-				puts "Closing Connections"
+			puts "Closing Connections"
 			self.close
 			puts "Processing Complete"
 		else
 			puts "We're outta here"
 		end
-		
 	end
 	
 	def processAdvancedOrders
 		#login and prepare for processing
 		#self.login
 		#self.prepare
-		puts "*- Advanced Orders -*"
-		parms[:advanced] => 'Y'
-		print "Enter FROM Date [MMDDYYYY]:"
-		parms[:date] => gets.chomp
-		print "Enter TO Date   [MMDDYYYY]:"
-		parms[:end_date] => gets.chomp
+		puts "*--------- Advanced Orders --------*"
+		print "      Enter FROM Date [MM/DD/YYYY]:"
+		parms = {:advanced => 'Y', :date => gets.chomp}
+		print "        Enter TO Date [MM/DD/YYYY]:"
+		parms[:end_date] = gets.chomp
 		print "Enter Borough   ['M'/'K1'/'A'(ll)]:"
-		parms[:boro] => gets.chomp
-		puts "Advanced Orders: Processing From Date: To Date: for Borough:"
+		parms[:boro] = gets.chomp.upcase
+		puts "Advanced Orders: Processing From Date: #{parms[:date]} To Date: #{parms[:end_date]} for Borough: #{parms[:boro]}"
 		print "Continue? (Y/N):"
 		continue = gets.chomp.upcase
+		
 		if continue == "Y"
 			puts "Preparing Connections and Downloading Orders..."
-			self.prepare(parms[])
+			self.prepare(parms)
 			puts "Processing Orders..."
-			self.processAdvancedOrders
+			#iterate through the orders (elements marked "elements")
+			i=0
+			x=0
+			@ns.each do |node| 
+				@purchase_order = node.at_xpath("order_id").content
+				@delivery_date = node.at_xpath("delivery_date").content
+				@ship_to = node.at_xpath("school_id").content.to_i
+				@cust_num = ((@ship_to/1000)*1000)+999
+				#puts "Mie #{@ship_to} converted to #{@mie}"
+				@special_instructions = node.at_xpath("special_instruction").content
+			
+				i += 1
+				#puts "Order id from node: #{node.name} is: #{@purchase_order}"
+				puts "Orders: #{i}" #indexing starts at zero
+				process_order_header @purchase_order, @cust_num, @ship_to, @delivery_date, @special_instructions
+
+				#iterate through the element details
+				node.children.each do |child|
+					#print child.name
+					x += 1
+					@spec_num = child['item_key']
+					@qty      = child['ordered_quantity']
+					process_order_detail @spec_num, @qty
+				end
+			end
+			
 			puts "Closing Connections"
 			self.close
 			puts "Processing Complete"
@@ -150,31 +175,41 @@ class OrderProcessor
 		puts "#{@writer.orders} Orders Processed with a total of #{@writer.total_order_lines} order lines."
 	end
 	
-private
-
-	def prepare (parms[])
+	protected
+	def prepare (parms)
 	
+		#puts "parms[:advanced] = #{parms[:advanced]}"
+		#puts "parms[:date] = #{parms[:date]}"
+		#puts "parms[:boro] = #{parms[:boro]}"
+		#puts "parms[:locked] = #{parms[:locked]}"
+		#puts "parms[:end_date] = #{parms[:end_date]}"
+		
 		doe_service = DoeOrders.new
 		doe_service.pass = @doe_pass
-		doe_service.user = @doe_user
-		doe_service.date => parms[:date]
+		doe_service.vendor_id = @doe_user
+		doe_service.date = parms[:date]
 		
-		If parms[:advanced]=='N'
+		if parms[:advanced]=='N'
 			#Get the DOE Orders and save off to a file
-			doe_service.boro => parms[:boro]
-			doe_service.locked_flag => parms[:locked]
+			#doe_service.boro = parms[:boro]
+			#doe_service.locked_flag = parms[:locked]
+			#puts "doe_service.pass = #{doe_service.pass}"
+			#puts "doe_service.vendor_id = #{doe_service.vendor_id}"
+			#puts "doe_service.date = #{doe_service.date}"
+			#puts "doe_service.boro = #{doe_service.boro}"
+			#puts "doe_service.lockeD_flag = #{doe_service.locked_flag}"
 			@orders = doe_service.GetCurrentOrders
 		
-			#Get XML orders from the Web Service File
-			doc = Nokogiri::XML(open("tmp/current_log.xml"))
+			#Get Current XML orders from the Web Service File
+			doc = Nokogiri::XML(open("tmp/current_orders.xml"))
 			
 		else
-			doe_service.end_date => parms[:end_date]
-			doe_service.boro => parms[:boro]
+			doe_service.end_date = parms[:end_date]
+			doe_service.boro = parms[:boro]
 			@orders = doe_service.GetAdvancedOrders
 		
-			#Get XML orders from the Web Service File
-			doc = Nokogiri::XML(open("tmp/advanced_log.xml"))
+			#Get Future XML orders from the Web Service File
+			doc = Nokogiri::XML(open("tmp/advanced_orders.xml"))
 		end			
 
 		#A NodeSet of the child elements - The DOE WebService names the elements "elements"
@@ -199,6 +234,9 @@ private
 		#Get Customer Item number details						
 		@cust_items = @database_handle.execute("select ficdel,ficdonated,oncitm,onitem from 
 																			vcoitem inner join r37files.finitem on onitem=ficitem where oncust=100000")
+		
+		@item_master = @database_handle.execute("select ficdel,ficdonated,oncitm,onitem from 
+																			vcoitem inner join r37files.finitem on onitem=ficitem where oncust=100000")
 		#@cust_items.each {|r| puts "#{r}"}
 		
 		puts "Customer Item# result count is: #{@cust_items.result_count}"
@@ -216,5 +254,7 @@ private
 		puts "process_order_detail for Spec:#{cust_item} Qty: #{cust_qty}"
 		@writer.write_order_detail(@database_handle)
 	end
+	
+	#private_class_method :prepare, :process_order_header, :process_order_detail
 			
 end

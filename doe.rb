@@ -16,14 +16,14 @@ class DoeOrders
 		@boro = ""
 	end
 
-attr_writer :vendor_id, :pass, :date, :to_date, :locked_flag, :boro
+	attr_accessor :vendor_id, :pass, :date, :end_date, :locked_flag, :boro
 
 	def GetCurrentOrders
 		client = Savon::Client.new do 
 		wsdl.document = "http://www.opt-osfns.org/osfns/resources/sfordering/SFWebService.asmx?WSDL"
 		end
-
-		File.open(@@wsdl_info,'w') do |f|
+		
+		File.open(@@wsdl_info,"w") do |f|
 			f.puts "WSDL query started at #{Time.now}"
 			#f.prints "Namespace: "
 			f.puts client.wsdl.namespace
@@ -34,16 +34,20 @@ attr_writer :vendor_id, :pass, :date, :to_date, :locked_flag, :boro
 		end
 
 		#client.http.headers["Cookie"] = response.http.headers["Set-Cookie"]
-
-		response = client.request :get_orders_xml do
+		#puts "* - DoeOrders - *"
+		#puts "vendor_id = #{@vendor_id}"
+		#puts "pass = #{@pass}"
+		#puts "date = #{@date}"
+		#puts "boro = #{@boro}"
+		#puts "finalDownload = #{@locked_flag}"
+		
+		response = client.request :get_orders_xml_all_boros_final do
 			soap.version = 2
-			soap.input = ["GetOrdersXML", {"xmlns" => "http://www.opt-osfns.org/"}]
+			soap.input = ["GetOrdersXMLAllBorosFinal", {"xmlns" => "http://www.opt-osfns.org/"}]
 			soap.body = {
-				"vendorId" => @vendor_id,
-				"pwd"      => @pass,
-				"deliveryDate" => @date,
-				"boro" => @boro,
-				"finalDownload" => @locked_flag
+				"vendorId" => self.vendor_id,
+				"pwd"      => self.pass,
+				"deliveryDate" => self.date,
 			}
 			soap.element_form_default = :unqualified
 			soap.namespaces = {
@@ -52,11 +56,14 @@ attr_writer :vendor_id, :pass, :date, :to_date, :locked_flag, :boro
 				"xmlns:soap12" => "http://www.w3.org/2003/05/soap-envelope"
 			}
 			soap.env_namespace = 'soap12'
+			#puts "soap body = #{soap.body}"
 		end
 
-		File.open(@@current_log_file,'w') do |f|
-			#f.puts "test started at #{Time.now}"
-			#f.puts response.http
+		puts "Current Working Directory is: #{Dir.pwd}"
+		File.new(@@current_log_file) unless File.exists?(@@current_log_file)
+		File.open(@@current_log_file,"w") do |f|
+			f.puts "test started at #{Time.now}"
+			f.puts response.http
 			f.puts response.to_xml
 		end
 		return response.to_xml
@@ -81,13 +88,13 @@ attr_writer :vendor_id, :pass, :date, :to_date, :locked_flag, :boro
 
 		response = client.request :get_orders_date_range_xml do
 			soap.version = 2
-			soap.input = ["GetOrdersXML", {"xmlns" => "http://www.opt-osfns.org/"}]
+			soap.input = ["GetOrdersDateRangeXML", {"xmlns" => "http://www.opt-osfns.org/"}]
 			soap.body = {
-				"vendorId" => @vendor_id,
-				"pwd"      => @pass,
-				"startDate" => @date,
-				"endDate" => @to_date,
-				"boro" => @boro
+				"vendorId" => self.vendor_id,
+				"pwd"      => self.pass,
+				"startDate" => self.date,
+				"endDate" => self.end_date,
+				"boro" => self.boro
 			}
 			soap.element_form_default = :unqualified
 			soap.namespaces = {
