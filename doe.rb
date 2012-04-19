@@ -18,29 +18,18 @@ class DoeOrders
 
 	attr_accessor :vendor_id, :pass, :date, :end_date, :locked_flag, :boro
 
-	def GetCurrentOrders
+	def get_current_orders
 		client = Savon::Client.new do 
 		wsdl.document = "http://www.opt-osfns.org/osfns/resources/sfordering/SFWebService.asmx?WSDL"
 		end
 		
 		File.open(@@wsdl_info,"w") do |f|
 			f.puts "WSDL query started at #{Time.now}"
-			#f.prints "Namespace: "
 			f.puts client.wsdl.namespace
-			#f.prints "Endpoint: "
 			f.puts client.wsdl.endpoint
-			#f.prints "Actions: "
 			f.puts client.wsdl.soap_actions
 		end
 
-		#client.http.headers["Cookie"] = response.http.headers["Set-Cookie"]
-		#puts "* - DoeOrders - *"
-		#puts "vendor_id = #{@vendor_id}"
-		#puts "pass = #{@pass}"
-		#puts "date = #{@date}"
-		#puts "boro = #{@boro}"
-		#puts "finalDownload = #{@locked_flag}"
-		
 		response = client.request :get_orders_xml_all_boros_final do
 			soap.version = 2
 			soap.input = ["GetOrdersXMLAllBorosFinal", {"xmlns" => "http://www.opt-osfns.org/"}]
@@ -56,7 +45,6 @@ class DoeOrders
 				"xmlns:soap12" => "http://www.w3.org/2003/05/soap-envelope"
 			}
 			soap.env_namespace = 'soap12'
-			#puts "soap body = #{soap.body}"
 		end
 
 		puts "Current Working Directory is: #{Dir.pwd}"
@@ -69,7 +57,7 @@ class DoeOrders
 		return response.to_xml
 	end
 	
-	def GetAdvancedOrders
+	def get_advanced_orders
 		client = Savon::Client.new do 
 		wsdl.document = "http://www.opt-osfns.org/osfns/resources/sfordering/SFWebService.asmx?WSDL"
 		end
@@ -83,8 +71,6 @@ class DoeOrders
 			#f.prints "Actions: "
 			f.puts client.wsdl.soap_actions
 		end
-
-		#client.http.headers["Cookie"] = response.http.headers["Set-Cookie"]
 
 		response = client.request :get_orders_date_range_xml do
 			soap.version = 2

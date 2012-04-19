@@ -15,10 +15,10 @@ if session.login
 		print "Enter option:"
 		@function = gets.chomp
 			case @function
-			when "1" then session.processAdvancedOrders
-			when "2" then session.processCurrentOrders
-			when "3" then session.maintainItemsToBreak
-			when "4" then session.maintainItemsToPounds
+			when "1" then session.process_advanced_orders
+			when "2" then session.process_current_orders
+			when "3" then session.maintain_items_to_break
+			when "4" then session.maintain_items_to_weight
 			end
 	else
 		puts "We're outta here"
