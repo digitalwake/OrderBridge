@@ -20,6 +20,8 @@ class OrderProcessor
 		@spec_num = ""
 		@qty= 0
 		@drop_ship = false
+		@item=""
+		@item_weight=0
 		return self
 	end
 	
@@ -188,7 +190,21 @@ class OrderProcessor
 	end
 	
 	def get_s2k_item(cust_item)
-		return "925500"
+		@item_master.each do |row|
+			if row.ONCITM == cust_item
+				@item_master.each do |items|
+					if items.FICBRAND == ('DONATED' || 'COMMODITY')
+						@item = items.ONITEM
+						@item_weight = items.ICWGHT
+					else
+						@item = row.ONITEM
+						@item_weight = row.ICWGHT	
+					end				
+			else
+				item_found = false
+			end
+		end
+		return item_found
 	end
 	
 	def drop_ship?(item)
@@ -227,7 +243,9 @@ class OrderProcessor
 				item = self.get_s2k_item(spec_num)
 				if drop_ship?(item)
 					@drop_ship = true
-					uom = self.get_uom
+					if item_to_break(item,@uom)
+						item += "-BC"
+					#uom = self.get_uom
 					#process_order_detail @purchase_order, @spec_num, @qty
 					orderline += 1
 					@writer.write_order_detail_drop_ship(@database_handle, @cust_num, @purchase_order, orderline, item, spec_num, uom, @ship_to, qty)
@@ -254,7 +272,7 @@ class OrderProcessor
 					spec_num = child['item_key']
 					qty = child['ordered_quantity']
 					item = self.get_s2k_item(spec_num)
-					uom = self.get_uom
+					#uom = self.get_uom
 							
 					orderline += 1
 					@writer.write_order_detail(@database_handle, @cust_num, @purchase_order, orderline, item, spec_num, uom, @ship_to, qty)

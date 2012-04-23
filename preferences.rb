@@ -12,8 +12,6 @@ class Preferences
 			puts "We're connected to SQLite3"
 			@db_local.execute("create table if not exists items_to_break (item integer)")
 			@db_local.execute("create table if not exists items_to_weight (item integer)")
-			@db_items_to_break = @db_local.execute("select * from items_to_break").fetch(:all,:Struct)
-			@db_items_weight_to_qty = @db_local.execute("select * from items_to_weight").fetch(:all,:Struct)
 		else
 			puts "We're not connected to SQLite3"
 		end
@@ -21,25 +19,56 @@ class Preferences
 	
 	def maintenance(parms = {})
 		puts "Maintenace type is: #{parms[:type]}"
+		puts "Adding or Deleting? (A/D):"
+		update_flag = gets.chomps.upcase
+		case parms[:type]
+			when = "broken" then
+				table = "items_to_break"
+			when = "weight" then
+				table = "items_to_weight"
+		end
+		puts "Enter your items. Type X to quit:"
+		input = gets.chomps.upcase
+			unless input == 'X'
+				maintain(input,table,flag)
+				puts "Enter your items. Type X to quit:"
+				input = gets.chomps.upcase
+			end
+	end
+	
+	def maintain(input,tbl,flag)
+		case flag
+			when "A" then add_to_pref_table(input,tbl)
+			when "D" then delete_from_pref_table(input,tbl)
+		end
 	end
 	
 	def get_items_to_break
-		return @db_items_to_break
+		rs = @db_local.execute("select * from items_to_break").fetch(:all,:Struct)
+		return rs
 	end
 	
 	def get_items_weight_to_qty
-		return @db_items_weight_to_qty
+		rs = @db_local.execute("select * from items_to_weight").fetch(:all,:Struct)
+		return rs
 	end
 	
-	def item_to_break(item)
-		#stub
-		@db_items_to_break.item.each do |x|
-			return true if item == x
-		end			
+	def item_to_break(item,uom)
+		rs = self.get__items_to_break
+		rs.item.each do |x|
+			if item == x
+				 uom='EA'
+				 broken_item = true
+			else
+				uom = 'CS'
+				broken_item = false
+		end
+		return broken_item		
 	end
 	
 	def item_weight_to_qty(item, qty, weight)
-		@db_items_weight_to_qty.item.each do |x|
+		rs = self.get_items_weight_to_qty
+		rs.item.each do |x|
 			if item == x
 				quantity = qty/weight
 				if qty % weight > 0
@@ -51,4 +80,14 @@ class Preferences
 			end
 		end
 	end
+	
+	protected
+	def delete_from_pref_table(input,tbl)
+		rs = @db_local.execute("delete from #{tbl} where item = #{item}")
+	end
+	
+	def add_to_pref_table(input,tbl)
+		rs = @db_local.execute("insert into #{tbl} (item) values(#{item})")
+	end
+	
 end
