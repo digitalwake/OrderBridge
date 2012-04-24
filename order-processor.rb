@@ -21,7 +21,7 @@ class OrderProcessor
 		@qty= 0
 		@drop_ship = false
 		@item=""
-		@item_weight=0
+		@item_weight=0.00
 		return self
 	end
 	
@@ -141,7 +141,8 @@ class OrderProcessor
 		else
 			doe_service.end_date = parms[:end_date]
 			doe_service.boro = parms[:boro]
-			#@orders = doe_service.get_advanced_orders
+			
+			#************************************#@orders = doe_service.get_advanced_orders**************
 		
 			#Get Future XML orders from the Web Service File
 			doc = Nokogiri::XML(open("tmp/advanced_orders.xml"))
@@ -189,66 +190,86 @@ class OrderProcessor
 		return "CS"
 	end
 	
-	def get_s2k_item(cust_item)
+	def set_s2k_item_and_weight(cust_item) #*******We need to log a warning for multiple results of the same type (Donated or Purchased)
+		rs = []
+		item_found = false
 		@item_master.each do |row|
-			if row.ONCITM == cust_item
-				@item_master.each do |items|
-					if items.FICBRAND == ('DONATED' || 'COMMODITY')
-						@item = items.ONITEM
-						@item_weight = items.ICWGHT
-					else
-						@item = row.ONITEM
-						@item_weight = row.ICWGHT	
-					end				
-			else
-				item_found = false
+			if row.ONCITM.strip == cust_item.strip
+				rs << {:item => row.ONITEM.to_s, :weight => row.ICWGHT, :brand => row.FICBRAND}			
 			end
 		end
-		return item_found
+		
+		#If we have no results exit with a failure
+		if rs.empty?
+			return false
+		else		
+			rs.each do |hsh|
+				break if item_found == true
+				@item = hsh[:item]
+				@item_weight = hsh[:weight]
+				if (hsh[:brand] == 'DONATED' or hsh[:brand] == 'COMMODITY') #**********Look into using the Donated Flag instead
+					item_found = true
+				end
+			end
+		end
+		return true
+		puts "#{@item} #{@item_weight}"
 	end
 	
 	def drop_ship?(item)
 		@item_master.each do |row|
 			if row.IFDROP == 'Y'
-				return true
+				@drop_ship_item = true
 			else
-				return false
+				@drop_ship_item = false
 			end
 		end
+		return @drop_ship_item
+	end
+	
+	def weight_to_case?(item)
+		@item_master.each do |row|
+			if row.IFDROP == 'Y'
+				@drop_ship_item = true
+			else
+				@drop_ship_item = false
+			end
+		end
+		return @drop_ship_item
 	end
 	
   def process
-	#iterate through the orders (elements marked "elements")
+		#Iterate through the orders (elements marked "elements")
 		i=0
 		@ns.each do |node| 
 			@purchase_order = node.at_xpath("order_id").content
 			@delivery_date = node.at_xpath("delivery_date").content
 			@ship_to = node.at_xpath("school_id").content.to_i
 			@cust_num = ((@ship_to/1000)*1000)+999
-			#puts "Mie #{@ship_to} converted to #{@mie}"
 			@special_instructions = node.at_xpath("special_instruction").content
 			
 			i += 1
-			#puts "Order id from node: #{node.name} is: #{@purchase_order}"
 			puts "Orders: #{i}" #indexing starts at zero
 				
-			#iterate through the element details looking for drop shipments
+			#Iterate through the element details looking for drop shipments
 			orderline=0
 			node.xpath('details').each do |child|
-				#print child.name
 				spec_num = child['item_key']
 				qty = child['ordered_quantity']
 				
-				#puts "First iteration: spec = #{child['item_key']}, qty = #{child['ordered_quantity']}"
-				item = self.get_s2k_item(spec_num)
-				if drop_ship?(item)
+				#First Iteration looking for Drop Shipments
+				@item = "0" unless self.set_s2k_item_and_weight(spec_num)
+				#self.set_s2k_item_and_weight(spec_num)
+				if drop_ship?(@item)
 					@drop_ship = true
-					if item_to_break(item,@uom)
-						item += "-BC"
-					#uom = self.get_uom
-					#process_order_detail @purchase_order, @spec_num, @qty
+					if @prefs.item_to_break(@item,@uom)
+						@item.strip!
+						@item += "-BC"
+					end
+					qty = @prefs.item_weight_to_qty(@item, qty, @item_weight)
 					orderline += 1
-					@writer.write_order_detail_drop_ship(@database_handle, @cust_num, @purchase_order, orderline, item, spec_num, uom, @ship_to, qty)
+					@writer.write_order_detail_drop_ship(@database_handle, @cust_num, @purchase_order,
+																								orderline, @item, spec_num, @uom, @ship_to, qty)
 						
 					#Remove the drop ship item from the node set
 					child.remove
@@ -256,26 +277,31 @@ class OrderProcessor
 					#do nothing
 				end						
 			end
-				
+			
+			#We don't write the order header until we're sure there is a drop shipment
 			if @drop_ship == true
 				@writer.write_order_header_drop_ship(@database_handle, @purchase_order, @cust_num, @ship_to, @delivery_date, @special_instructions)
-					
-				#set drop ship to no for the next iteration since the drop ships have been processed
+				#set drop ship to no for the next run since the drop ships have been processed
 				@drop_ship = false
 			end
-					
+			
+			#Second Iteration after Drop ships have been removed.
 			unless node.xpath('details').empty?
 				@writer.write_order_header(@database_handle, @purchase_order, @cust_num, @ship_to, @delivery_date, @special_instructions)
-				#iterate through the element details again for the regular shipment
 				orderline=0
 				node.xpath('details').each do |child|
 					spec_num = child['item_key']
 					qty = child['ordered_quantity']
-					item = self.get_s2k_item(spec_num)
-					#uom = self.get_uom
-							
+					@item = "0" unless self.set_s2k_item_and_weight(spec_num)
+					#self.set_s2k_item_and_weight(spec_num)
+					if @prefs.item_to_break(@item, @uom)
+						@item.strip!
+						@item += "-BC"
+					end
+					qty = @prefs.item_weight_to_qty(@item, qty, @item_weight)
+					
 					orderline += 1
-					@writer.write_order_detail(@database_handle, @cust_num, @purchase_order, orderline, item, spec_num, uom, @ship_to, qty)
+					@writer.write_order_detail(@database_handle, @cust_num, @purchase_order, orderline, @item, spec_num, @uom, @ship_to, qty)
 											
 					#Remove the item from the node set
 					child.remove
