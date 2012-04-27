@@ -53,20 +53,18 @@ class Preferences
 		return rs
 	end
 	
-	def item_to_break(item,uom)
+	def item_to_break(item)
 		rs = self.get_items_to_break
 		unless rs.empty? 
 			rs.item.each do |x|
 				if item == x
 				 	uom='EA'
-				 	broken_item = true
 				else
 					uom = 'CS'
-					broken_item = false
 				end
 			end
 		end
-		return (defined? broken_item).nil? ? false : broken_item		
+		return rs.empty? ? 'CS' : uom		
 	end
 	
 	def item_weight_to_qty(item, qty, weight)

@@ -10,7 +10,7 @@ class OrderWriter
 		@orders += 1
 		puts "OrderWriter.write_order_header_drop_ship called."
 		dbh.execute("Insert into t37files.vedxpohw(EHCMP,EHTYPE,EHCUST,EHPONO,EHSHIP,EHDDT8) 
-								Values (1,'D ', '#{cust}', '#{po}', '#{ship_to}', #{date})")
+								Values (1,'D ', '#{cust}', '#{po}', '#{ship_to}', #{date.strftime("%Y%m%d")})")
 	end
 	
 	def write_order_detail_drop_ship(dbh,cust,po,line,item,cust_item,uom,ship_to,qty)
@@ -24,7 +24,7 @@ class OrderWriter
 		@orders += 1
 		#puts "OrderWriter.write_order_header called."
 		dbh.execute("Insert into t37files.vedxpohw(EHCMP,EHCUST,EHPONO,EHSHIP,EHDDT8) 
-								Values (1, '#{cust}', '#{po}', '#{ship_to}', #{date})")
+								Values (1, '#{cust}', '#{po}', '#{ship_to}', #{date.strftime("%Y%m%d")})")
 	end
 	
 	def write_order_detail(dbh,cust,po,line,item,cust_item,uom,ship_to,qty)

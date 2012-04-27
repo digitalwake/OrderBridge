@@ -5,12 +5,14 @@ require 'nokogiri'
 require './doe.rb'
 require './order-writer.rb'
 require './preferences.rb'
+require './log-writer.rb'
 
 class OrderProcessor
 
 	def initialize
 		@writer = OrderWriter.new
 		@prefs = Preferences.new
+		@log = LogWriter.new
 		@orders_processed = 0
 		@purchase_order = 0
 		@delivery_date = 0
@@ -142,7 +144,7 @@ class OrderProcessor
 			doe_service.end_date = parms[:end_date]
 			doe_service.boro = parms[:boro]
 			
-			#************************************#@orders = doe_service.get_advanced_orders**************
+			@orders = doe_service.get_advanced_orders
 		
 			#Get Future XML orders from the Web Service File
 			doc = Nokogiri::XML(open("tmp/advanced_orders.xml"))
@@ -159,30 +161,33 @@ class OrderProcessor
 			puts "We're not connected to S2K"
 		end
 				
-		#Get Customer Item number details						
-		#@cust_items = @database_handle.execute("select ficdel,ficdonated,oncitm,onitem from 
-																					#vcoitem inner join r37files.finitem on onitem=ficitem where oncust=100000")
-																					#.fetch(:all,:Struct)
-																					#.fetch(:all)
 		#Get item info
 		@item_master = @database_handle.execute("SELECT DISTINCT R37MODSDTA.VCOITEM.ONITEM, R37MODSDTA.VCOITEM.ONCITM,
-																						R37FILES.FINITEM.FICBRAND, R37FILES.VINITEM.ICDSC1,R37FILES.VINITEM.ICWGHT,
+																						R37FILES.FINITEM.FICDONATED, R37FILES.FINITEM.FICBRAND, R37FILES.VINITEM.ICDSC1, 
+																						R37FILES.VINITEM.ICWGHT,
 																						R37FILES.VINITEM.ICDEL, R37MODSDTA.VCOITEM.ONCUST, R37FILES.VINITMB.IFDROP 
 																						FROM (R37FILES.VINITEM INNER JOIN R37MODSDTA.VCOITEM ON 
 																						(R37FILES.VINITEM.ICITEM = R37MODSDTA.VCOITEM.ONITEM)) INNER JOIN R37FILES.FINITEM ON 
 																						R37MODSDTA.VCOITEM.ONITEM = R37FILES.FINITEM.FICITEM INNER JOIN R37FILES.VINITMB ON 
 																						R37FILES.VINITMB.IFITEM=R37FILES.FINITEM.FICITEM WHERE 
-																						(((R37MODSDTA.VCOITEM.ONCUST)='100000 ')) AND ICDEL <> 'I'").fetch(:all,:Struct)
-																						#.fetch(:all)
+																						(((R37MODSDTA.VCOITEM.ONCUST)='100000 ')) AND ICDEL <> 'I'")
+																						.fetch(:all,:Struct)
+		#@item_master.each do |row|
+		#	puts "#{row}"
+		#end															
 																						
 		#Clear EDI tables
 		@database_handle.execute("delete from t37files.vedxpohw")
 		@database_handle.execute("delete from t37files.vedxpodh")
-		
-		#puts "Customer Item# result count is: #{@cust_items.result_count}"
-		#puts "Item Master result count is: #{@item_master.result_count}"
-		
-		#@item_master.each {|r| puts "#{r}"}				
+				
+	end
+	
+	def get_date(str)
+		t=Time.new
+		t.month = str.byteslice(0,2)
+		t.day = str.byteslice(3,2)
+		t.year = str.byteslice(6,4)
+		return t
 	end
 	
 	def get_uom
@@ -190,30 +195,68 @@ class OrderProcessor
 		return "CS"
 	end
 	
-	def set_s2k_item_and_weight(cust_item) #*******We need to log a warning for multiple results of the same type (Donated or Purchased)
+	def set_s2k_item_and_weight(cust_item, order, qty) 
 		rs = []
 		item_found = false
+		donated_count = 0
+		purchased_count = 0
 		@item_master.each do |row|
 			if row.ONCITM.strip == cust_item.strip
-				rs << {:item => row.ONITEM.to_s, :weight => row.ICWGHT, :brand => row.FICBRAND}			
+				if row.FICDONATED == 'Y' #and row.ICDEL != 'I'
+					donated_count += 1
+				else
+					purchased_count += 1 #unless row.ICDEL = 'I'
+				end
+				rs << {:item => row.ONITEM.to_s, :weight => row.ICWGHT, :donated => row.FICDONATED}	#unless row.ICDEL = 'I'
+				#if row.ICDEL = 'I'
+					#@log.inactive :spec => cust_item, :item => row.ONITEM, :order => order, :qty => qty
+				#end
 			end
 		end
 		
 		#If we have no results exit with a failure
 		if rs.empty?
+			@log.error :cust => @cust_num,
+								 :ship => @ship_to,
+								 :order => @purchase_order,
+								 :item => @spec_num,
+								 :qty  => @qty,
+								 :date => @delivery_date,
+								 :msg => "No Active Item Found"
+								 
 			return false
-		else		
+		else
+			if donated_count > 1
+				@log.warning rs, :cust => @cust_num,
+								 		 :ship => @ship_to,
+								 		 :order => @purchase_order,
+								 		 :date => @delivery_date,
+								 		 :qty  => @qty,
+								 		 :item => @spec_num,
+								 		 :msg => "Too many Donated Matches"
+			end
+			
+			if purchased_count > 1
+				@log.warning rs, :cust => @cust_num,
+								 		 :ship => @ship_to,
+								 		 :order => @purchase_order,
+								 		 :date => @delivery_date,
+								 		 :qty  => @qty,
+								 		 :item => @spec_num,
+								 		 :msg => "Too many Purchased Matches"
+			end
+				 	
 			rs.each do |hsh|
 				break if item_found == true
 				@item = hsh[:item]
 				@item_weight = hsh[:weight]
-				if (hsh[:brand] == 'DONATED' or hsh[:brand] == 'COMMODITY') #**********Look into using the Donated Flag instead
+				if hsh[:donated] == 'Y'
 					item_found = true
 				end
 			end
 		end
 		return true
-		puts "#{@item} #{@item_weight}"
+		#puts "#{@item} #{@item_weight}"
 	end
 	
 	def drop_ship?(item)
@@ -243,7 +286,7 @@ class OrderProcessor
 		i=0
 		@ns.each do |node| 
 			@purchase_order = node.at_xpath("order_id").content
-			@delivery_date = node.at_xpath("delivery_date").content
+			@delivery_date = self.get_date(node.at_xpath("delivery_date").content)
 			@ship_to = node.at_xpath("school_id").content.to_i
 			@cust_num = ((@ship_to/1000)*1000)+999
 			@special_instructions = node.at_xpath("special_instruction").content
@@ -254,22 +297,25 @@ class OrderProcessor
 			#Iterate through the element details looking for drop shipments
 			orderline=0
 			node.xpath('details').each do |child|
-				spec_num = child['item_key']
-				qty = child['ordered_quantity']
+				@spec_num = child['item_key']
+				@qty = child['ordered_quantity']
 				
 				#First Iteration looking for Drop Shipments
-				@item = "0" unless self.set_s2k_item_and_weight(spec_num)
+				@item = "0" unless self.set_s2k_item_and_weight(@spec_num, @purchase_order, @qty)
 				#self.set_s2k_item_and_weight(spec_num)
 				if drop_ship?(@item)
 					@drop_ship = true
-					if @prefs.item_to_break(@item,@uom)
-						@item.strip!
-						@item += "-BC"
+					uom =  @prefs.item_to_break(@item)
+					if uom == 'EA'
+						unless item.include? "-BC"	
+							@item.strip!
+							@item += "-BC"
+						end
 					end
-					qty = @prefs.item_weight_to_qty(@item, qty, @item_weight)
+					@qty = @prefs.item_weight_to_qty(@item, @qty, @item_weight)
 					orderline += 1
 					@writer.write_order_detail_drop_ship(@database_handle, @cust_num, @purchase_order,
-																								orderline, @item, spec_num, @uom, @ship_to, qty)
+																								orderline, @item, @spec_num, uom, @ship_to, @qty)
 						
 					#Remove the drop ship item from the node set
 					child.remove
@@ -290,26 +336,27 @@ class OrderProcessor
 				@writer.write_order_header(@database_handle, @purchase_order, @cust_num, @ship_to, @delivery_date, @special_instructions)
 				orderline=0
 				node.xpath('details').each do |child|
-					spec_num = child['item_key']
-					qty = child['ordered_quantity']
-					@item = "0" unless self.set_s2k_item_and_weight(spec_num)
+					@spec_num = child['item_key']
+					@qty = child['ordered_quantity']
+					@item = "0" unless self.set_s2k_item_and_weight(@spec_num, @purchase_order, @qty)
 					#self.set_s2k_item_and_weight(spec_num)
-					if @prefs.item_to_break(@item, @uom)
-						@item.strip!
-						@item += "-BC"
+					uom =  @prefs.item_to_break(@item)
+					if uom == 'EA'
+						unless item.include? "-BC"	
+							@item.strip!
+							@item += "-BC"
+						end
 					end
-					qty = @prefs.item_weight_to_qty(@item, qty, @item_weight)
+					@qty = @prefs.item_weight_to_qty(@item, @qty, @item_weight)
 					
 					orderline += 1
-					@writer.write_order_detail(@database_handle, @cust_num, @purchase_order, orderline, @item, spec_num, @uom, @ship_to, qty)
+					#puts "Item UOM = #{uom}"
+					@writer.write_order_detail(@database_handle, @cust_num, @purchase_order, orderline, @item, @spec_num, uom, @ship_to, @qty)
 											
 					#Remove the item from the node set
 					child.remove
 				end
 			end #unless
-			#@ns.each do |child|
-				#puts "Node: #{child}"
-			#end
 		end
   end
 	#private_class_method :prepare, :process_order_header, :process_order_detail

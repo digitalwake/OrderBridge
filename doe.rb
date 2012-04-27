@@ -8,6 +8,7 @@ class DoeOrders
 @@wsdl_info = "tmp/info.txt"
 
 	def initialize
+		Dir.mkdir('./tmp') unless Dir.exists?('./tmp')
 		@vendor_id = ""
 		@pass = ""
 		@date = ""
@@ -47,10 +48,9 @@ class DoeOrders
 			soap.env_namespace = 'soap12'
 		end
 
-		puts "Current Working Directory is: #{Dir.pwd}"
 		File.new(@@current_log_file) unless File.exists?(@@current_log_file)
 		File.open(@@current_log_file,"w") do |f|
-			f.puts "test started at #{Time.now}"
+			f.puts "Started at #{Time.now}"
 			f.puts response.http
 			f.puts response.to_xml
 		end

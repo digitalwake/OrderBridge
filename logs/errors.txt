@@ -1,0 +1,5 @@
+OrderBridge 2.0 ERROR Report (run at: 2012-04-26 17:05:42 -0400)
+No Active Item Found **********
+Date: 05/18/2012  Customer:       2999  Ship-to:       2126  Order:    1437819 Item:  BF  M142   Qty:   1.00
+No Active Item Found **********
+Date: 05/18/2012  Customer:       2999  Ship-to:       2126  Order:    1437819 Item:  BF  M142   Qty:   1.00
