@@ -183,11 +183,10 @@ class OrderProcessor
 	end
 	
 	def get_date(str)
-		t=Time.new
-		t.month = str.byteslice(0,2)
-		t.day = str.byteslice(3,2)
-		t.year = str.byteslice(6,4)
-		return t
+		new_str = "#{str.byteslice(6,4)}#{str.byteslice(0,2)}#{str.byteslice(3,2)}"
+		if new_str.include? "/"
+			new_str = 0
+		return new_str
 	end
 	
 	def get_uom
@@ -287,6 +286,10 @@ class OrderProcessor
 		@ns.each do |node| 
 			@purchase_order = node.at_xpath("order_id").content
 			@delivery_date = self.get_date(node.at_xpath("delivery_date").content)
+			if @delivery_date == 0
+				puts "Invalid Delivery Date Entered"
+				return false
+			end
 			@ship_to = node.at_xpath("school_id").content.to_i
 			@cust_num = ((@ship_to/1000)*1000)+999
 			@special_instructions = node.at_xpath("special_instruction").content
