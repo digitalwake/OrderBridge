@@ -86,14 +86,14 @@ class OrderProcessor
 	end
 	
 	def process_advanced_orders
-				puts "*--------- Advanced Orders --------*"
+		puts "*--------- Advanced Orders --------*"
 		print "      Enter FROM Date [MM/DD/YYYY]:"
 		parms = {:advanced => 'Y', :date => gets.chomp}
 		print "        Enter TO Date [MM/DD/YYYY]:"
 		parms[:end_date] = gets.chomp
 		print "Enter Borough   ['M'/'K1'/'A'(ll)]:"
 		parms[:boro] = gets.chomp.upcase
-		puts "Advanced Orders: Processing From Date: #{parms[:date]} To Date: #{parms[:end_date]} for Borough: #{parms[:boro]}"
+		puts "Advanced Orderslog.c: Processing From Date: #{parms[:date]} To Date: #{parms[:end_date]} for Borough: #{parms[:boro]}"
 		print "Continue? (Y/N):"
 		continue = gets.chomp.upcase
 		
@@ -125,6 +125,7 @@ class OrderProcessor
 		@database_handle.disconnect
 		#@db_local.disconnect
 		puts "#{@writer.orders} Orders Processed with a total of #{@writer.total_order_lines} order lines."
+    #@log.close
 	end
 	
 	protected
@@ -186,6 +187,7 @@ class OrderProcessor
 		new_str = "#{str.byteslice(6,4)}#{str.byteslice(0,2)}#{str.byteslice(3,2)}"
 		if new_str.include? "/"
 			new_str = 0
+		end
 		return new_str
 	end
 	
@@ -287,7 +289,7 @@ class OrderProcessor
 			@purchase_order = node.at_xpath("order_id").content
 			@delivery_date = self.get_date(node.at_xpath("delivery_date").content)
 			if @delivery_date == 0
-				puts "Invalid Delivery Date Entered"
+				puts "Invalid Delivery Date in Webservice"
 				return false
 			end
 			@ship_to = node.at_xpath("school_id").content.to_i
@@ -297,69 +299,43 @@ class OrderProcessor
 			i += 1
 			puts "Orders: #{i}" #indexing starts at zero
 				
-			#Iterate through the element details looking for drop shipments
-			orderline=0
+			#Iterate through the element details while looking for drop shipments
+			orderline = 0
+			drop_ship_orderline = 0
 			node.xpath('details').each do |child|
 				@spec_num = child['item_key']
 				@qty = child['ordered_quantity']
 				
-				#First Iteration looking for Drop Shipments
+				#Iterate while looking for Drop Shipments
 				@item = "0" unless self.set_s2k_item_and_weight(@spec_num, @purchase_order, @qty)
-				#self.set_s2k_item_and_weight(spec_num)
-				if drop_ship?(@item)
-					@drop_ship = true
-					uom =  @prefs.item_to_break(@item)
-					if uom == 'EA'
-						unless item.include? "-BC"	
-							@item.strip!
-							@item += "-BC"
-						end
+				uom =  @prefs.item_to_break(@item)
+				if uom == 'EA'
+					unless item.include? "-BC"	
+						@item.strip!
+						@item += "-BC"
 					end
-					@qty = @prefs.item_weight_to_qty(@item, @qty, @item_weight)
-					orderline += 1
+				end
+				@qty = @prefs.item_weight_to_qty(@item, @qty, @item_weight)
+				if drop_ship?(@item)
+					drop_ship_orderline += 1
+					@drop_ship = true
 					@writer.write_order_detail_drop_ship(@database_handle, @cust_num, @purchase_order,
-																								orderline, @item, @spec_num, uom, @ship_to, @qty)
-						
-					#Remove the drop ship item from the node set
-					child.remove
+																								drop_ship_orderline, @item, @spec_num, uom, @ship_to, @qty)
 				else
-					#do nothing
-				end						
-			end
+					orderline += 1
+					@writer.write_order_detail(@database_handle, @cust_num, @purchase_order, orderline, @item, @spec_num, uom, @ship_to, @qty)
+				end
+			end #of details block
 			
-			#We don't write the order header until we're sure there is a drop shipment
 			if @drop_ship == true
 				@writer.write_order_header_drop_ship(@database_handle, @purchase_order, @cust_num, @ship_to, @delivery_date, @special_instructions)
 				#set drop ship to no for the next run since the drop ships have been processed
-				@drop_ship = false
+				@drop_ship = false				
 			end
 			
-			#Second Iteration after Drop ships have been removed.
-			unless node.xpath('details').empty?
+			if orderline > 0
 				@writer.write_order_header(@database_handle, @purchase_order, @cust_num, @ship_to, @delivery_date, @special_instructions)
-				orderline=0
-				node.xpath('details').each do |child|
-					@spec_num = child['item_key']
-					@qty = child['ordered_quantity']
-					@item = "0" unless self.set_s2k_item_and_weight(@spec_num, @purchase_order, @qty)
-					#self.set_s2k_item_and_weight(spec_num)
-					uom =  @prefs.item_to_break(@item)
-					if uom == 'EA'
-						unless item.include? "-BC"	
-							@item.strip!
-							@item += "-BC"
-						end
-					end
-					@qty = @prefs.item_weight_to_qty(@item, @qty, @item_weight)
-					
-					orderline += 1
-					#puts "Item UOM = #{uom}"
-					@writer.write_order_detail(@database_handle, @cust_num, @purchase_order, orderline, @item, @spec_num, uom, @ship_to, @qty)
-											
-					#Remove the item from the node set
-					child.remove
-				end
-			end #unless
+			end
 		end
   end
 	#private_class_method :prepare, :process_order_header, :process_order_detail

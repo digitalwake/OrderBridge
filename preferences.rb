@@ -56,9 +56,9 @@ class Preferences
 	def item_to_break(item)
 		rs = self.get_items_to_break
 		unless rs.empty? 
-			rs.item.each do |x|
+			rs.each do |x|
 				if item == x
-				 	uom='EA'
+				 	uom = 'EA'
 				else
 					uom = 'CS'
 				end
@@ -70,7 +70,7 @@ class Preferences
 	def item_weight_to_qty(item, qty, weight)
 		rs = self.get_items_weight_to_qty
 		unless rs.empty?
-			rs.item.each do |x|
+			rs.each do |x|
 				if item == x
 					new_qty = qty/(weight*100)
 					if qty % (weight*100) > 0
@@ -85,11 +85,11 @@ class Preferences
 	
 	protected
 	def delete_from_pref_table(input,tbl)
-		rs = @db_local.execute("delete from #{tbl} where item = #{input}")
+		@db_local.execute("delete from #{tbl} where item = #{input}")
 	end
 	
 	def add_to_pref_table(input,tbl)
-		rs = @db_local.execute("insert into #{tbl} (item) values(#{input})")
+		@db_local.execute("insert into #{tbl} (item) values(#{input})")
 	end
 	
 end

@@ -3,8 +3,8 @@ require 'savon'
 
 class DoeOrders
 
-@@current_log_file = "tmp/current_orders.xml"
-@@advanced_log_file = "tmp/advanced_orders.xml"
+@@current_log_file = "tmp/current_orders_#{Time.now.strftime("%Y%m%d.xml")}"
+@@advanced_log_file = "tmp/advanced_orders_#{Time.now.strftime("%Y%m%d.xml")}"
 @@wsdl_info = "tmp/info.txt"
 
 	def initialize

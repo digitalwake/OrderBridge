@@ -5,3 +5,7 @@ tmp/*
 *.db
 *.sqlite
 *.sqlite3
+logs
+logs/*
+data
+data/*

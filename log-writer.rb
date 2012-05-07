@@ -1,8 +1,8 @@
 class LogWriter
 
-@@warning_file = "logs/warnings.txt"
-@@error_file = "logs/errors.txt"
-@@inactive_item_file = "logs/inactive_items.txt"
+@@warning_file = "logs/warnings_#{Time.now.strftime("%Y%m%d.txt")}"
+@@error_file = "logs/errors_#{Time.now.strftime("%Y%m%d.txt")}"
+@@inactive_item_file = "logs/inactive_items__#{Time.now.strftime("%Y%m%d.txt")}"
 
 	def initialize
 		Dir.mkdir('./logs') unless Dir.exists?('./logs')
@@ -37,15 +37,15 @@ class LogWriter
 	end
 	
 	def close
-		#day = Time.day
-		#month = Time.month
-		#year = Time.year
+		#day = Time.now.day
+		#month = Time.now.month
+		#year = Time.now.year
 		#filename = "#{year}#{month}#{day}.txt"
-		#File.rename(@@warning_file, "logs/warnings" + filename)
-		#File.rename(@@error_file, "logs/errors" + filename)
+		#File.rename(@@warning_file, @@warning_file.sub(/(\.[a-z]*)/,'') + filename)
+		#File.rename(@@error_file, @@error_file.sub(/(\.[a-z]*)/,'') + filename)
 		#File.rename(@@inactive_item_file, "logs/inactive_items" + filename)
-		File.close(@@warning_file)
-		File.close(@@error_file)
+		#File.close(@@warning_file)
+		#File.close(@@error_file)
 		#File.close(@@inactive_item_file)
 	end
 	
