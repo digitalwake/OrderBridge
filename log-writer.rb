@@ -2,7 +2,7 @@ class LogWriter
 
 @@warning_file = "logs/warnings_#{Time.now.strftime("%Y%m%d.txt")}"
 @@error_file = "logs/errors_#{Time.now.strftime("%Y%m%d.txt")}"
-@@inactive_item_file = "logs/inactive_items__#{Time.now.strftime("%Y%m%d.txt")}"
+@@inactive_item_file = "logs/inactive_items_#{Time.now.strftime("%Y%m%d.txt")}"
 
 	def initialize
 		Dir.mkdir('./logs') unless Dir.exists?('./logs')
@@ -18,14 +18,16 @@ class LogWriter
 	
 	def error(parms = {})
 		@efh.puts "#{parms[:msg]} **********"
-		@efh.print "Date: #{format("%10s", parms[:date])}  Customer: #{format("%10s", parms[:cust])}  Ship-to: #{format("%10s", parms[:ship])}"
-		@efh.puts "  Order: #{format("%10s", parms[:order])} Item: #{format("%10s", parms[:item])}  Qty: #{format("%6s", parms[:qty])}"		
+		@efh.print "Date: #{format("%10s", parms[:date])}  Customer: #{format("%8s", parms[:cust])}  Ship-to: #{format("%8s", parms[:ship])}"
+		@efh.puts "  Order: #{format("%10s", parms[:order])} Item: #{format("%10s", parms[:item])}-#{format("%10s", parms[:item_dsc])}
+							 Qty: #{format("%6s", parms[:qty])}"		
 	end
 	
 	def warning(rs, parms = {})
 		@wfh.puts "#{parms[:msg]} **********"
-		@wfh.print "Date: #{format("%10s", parms[:date])}  Customer: #{format("%10s", parms[:cust])}  Ship-to: #{format("%10s", parms[:ship])}"
-		@wfh.puts "  Order: #{format("%10s", parms[:order])}  Item: #{format("%10s", parms[:item])}  Qty: #{format("%6s", parms[:qty])}"
+		@wfh.print "Date: #{format("%10s", parms[:date])}  Customer: #{format("%8s", parms[:cust])}  Ship-to: #{format("%8s", parms[:ship])}"
+		@wfh.puts "  Order: #{format("%10s", parms[:order])}  Item: #{format("%10s", parms[:item])}-#{format("%10s", parms[:item_dsc])}
+							 Qty: #{format("%6s", parms[:qty])}"
 		rs.each do |x|
 			@wfh.puts "item: #{x[:item]}"
 		end

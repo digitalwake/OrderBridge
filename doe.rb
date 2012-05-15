@@ -13,8 +13,18 @@ class DoeOrders
 		@pass = ""
 		@date = ""
 		@end_date = ""
-		@locked_flag = 0
+		@locked_flag = false
 		@boro = ""
+		@cfh = File.open(@@current_log_file, "w")
+		@afh = File.open(@@advanced_log_file, "w")
+	end
+
+	def get_order_filename
+		return @@current_log_file
+	end
+
+	def get_advanced_order_filename
+		return @@advanced_log_file
 	end
 
 	attr_accessor :vendor_id, :pass, :date, :end_date, :locked_flag, :boro
@@ -31,9 +41,15 @@ class DoeOrders
 			f.puts client.wsdl.soap_actions
 		end
 
-		response = client.request :get_orders_xml_all_boros_final do
+		response = client.request :get_orders_xml_all_boros do
 			soap.version = 2
-			soap.input = ["GetOrdersXMLAllBorosFinal", {"xmlns" => "http://www.opt-osfns.org/"}]
+			if locked_flag == true
+				soap.input = ["GetOrdersXMLAllBorosFinal", {"xmlns" => "http://www.opt-osfns.org/"}]
+				puts "GetOrdersXMLAllBorosFinal called. (LOCKED)"
+			else
+				soap.input = ["GetOrdersXMLAllBoros", {"xmlns" => "http://www.opt-osfns.org/"}]
+				puts "GetOrdersXMLAllBoros called. (NOT locked)"
+			end
 			soap.body = {
 				"vendorId" => self.vendor_id,
 				"pwd"      => self.pass,
@@ -48,12 +64,14 @@ class DoeOrders
 			soap.env_namespace = 'soap12'
 		end
 
-		File.new(@@current_log_file) unless File.exists?(@@current_log_file)
-		File.open(@@current_log_file,"w") do |f|
-			f.puts "Started at #{Time.now}"
-			f.puts response.http
-			f.puts response.to_xml
-		end
+		#File.new(@@current_log_file) unless File.exists?(@@current_log_file)
+		#File.open(@@current_log_file,"w") do |f|
+			#f.puts "Started at #{Time.now} Order Lock = #{:locked_flag}"
+			#f.puts response.http
+			#f.puts response.to_xml
+		#end
+		@cfh.puts response.to_xml
+		@cfh.close
 		return response.to_xml
 	end
 	
@@ -91,11 +109,13 @@ class DoeOrders
 			soap.env_namespace = 'soap12'
 		end
 
-		File.open(@@advanced_log_file,'w') do |f|
+		#File.open(@@advanced_log_file,'w') do |f|
 			#f.puts "test started at #{Time.now}"
 			#f.puts response.http
-			f.puts response.to_xml
-		end
+			#f.puts response.to_xml
+		#end
+		@afh.puts response.to_xml
+		@afh.close
 		return response.to_xml
 	end
 end

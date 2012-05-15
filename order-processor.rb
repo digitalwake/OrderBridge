@@ -9,6 +9,8 @@ require './log-writer.rb'
 
 class OrderProcessor
 
+@@library_prefix="T37"
+
 	def initialize
 		@writer = OrderWriter.new
 		@prefs = Preferences.new
@@ -23,6 +25,7 @@ class OrderProcessor
 		@qty= 0
 		@drop_ship = false
 		@item=""
+		@item_dsc=""
 		@item_weight=0.00
 		return self
 	end
@@ -63,15 +66,23 @@ class OrderProcessor
 	end
 	
 	def process_current_orders
-		puts "*-------- Current Orders --------*"
-		print "         Enter Date [MM/DD/YYYY]:"
+		puts "*--------- Current Orders ----------*"
+		print "            Enter Date [MM/DD/YYYY]:"
 		parms = {:advanced => 'N', :date => gets.chomp}
-		print "Enter Borough ['M'/'K1'/'A'(ll)]:"
-		parms[:boro] = gets.chomp.upcase
+		#print "   Enter Borough ['M'/'K1'/'A'(ll)]:"
+		#parms[:boro] = gets.chomp.upcase
+		print "LOCK customer Orders for this date?:"
+		parms[:lock] = gets.chomp.upcase
 		
-		print "**This will LOCK ALL the orders for this date.** Continue? (Y/N):"
+		if parms[:lock] == 'Y'
+			puts "Current Orders: LOCKED ORDERS for Date: #{parms[:date]} for Borough: #{parms[:boro]}"
+			print "**This will LOCK ALL the orders for this date.** Continue? (Y/N):"
+		else
+			puts "Current Orders: UNLOCKED ORDERS for Date: #{parms[:date]} for Borough: #{parms[:boro]}"
+			print "Continue? (Y/N):"
+		end
+		
 		continue = gets.chomp.upcase
-		
 		if continue == "Y"
 			puts "Preparing Connections and Downloading Orders..."
 			self.prepare(parms)
@@ -93,7 +104,7 @@ class OrderProcessor
 		parms[:end_date] = gets.chomp
 		print "Enter Borough   ['M'/'K1'/'A'(ll)]:"
 		parms[:boro] = gets.chomp.upcase
-		puts "Advanced Orderslog.c: Processing From Date: #{parms[:date]} To Date: #{parms[:end_date]} for Borough: #{parms[:boro]}"
+		puts "Advanced Orders: Processing From Date: #{parms[:date]} To Date: #{parms[:end_date]} for Borough: #{parms[:boro]}"
 		print "Continue? (Y/N):"
 		continue = gets.chomp.upcase
 		
@@ -137,10 +148,11 @@ class OrderProcessor
 		doe_service.date = parms[:date]
 		
 		if parms[:advanced]=='N'
-			#@orders = doe_service.get_current_orders
+			doe_service.locked_flag = parms[:lock] == 'Y' ? true : false
+			@orders = doe_service.get_current_orders
 		
 			#Get Current XML orders from the Web Service File
-			doc = Nokogiri::XML(open("tmp/current_orders.xml"))		
+			doc = Nokogiri::XML(open(doe_service.get_order_filename))		
 		else
 			doe_service.end_date = parms[:end_date]
 			doe_service.boro = parms[:boro]
@@ -148,7 +160,7 @@ class OrderProcessor
 			@orders = doe_service.get_advanced_orders
 		
 			#Get Future XML orders from the Web Service File
-			doc = Nokogiri::XML(open("tmp/advanced_orders.xml"))
+			doc = Nokogiri::XML(open(doe_service.get_advanced_order_filename))
 		end			
 
 		#A NodeSet of the child elements - The DOE WebService names the elements "elements"
@@ -163,16 +175,29 @@ class OrderProcessor
 		end
 				
 		#Get item info
-		@item_master = @database_handle.execute("SELECT DISTINCT R37MODSDTA.VCOITEM.ONITEM, R37MODSDTA.VCOITEM.ONCITM,
-																						R37FILES.FINITEM.FICDONATED, R37FILES.FINITEM.FICBRAND, R37FILES.VINITEM.ICDSC1, 
-																						R37FILES.VINITEM.ICWGHT,
-																						R37FILES.VINITEM.ICDEL, R37MODSDTA.VCOITEM.ONCUST, R37FILES.VINITMB.IFDROP 
-																						FROM (R37FILES.VINITEM INNER JOIN R37MODSDTA.VCOITEM ON 
-																						(R37FILES.VINITEM.ICITEM = R37MODSDTA.VCOITEM.ONITEM)) INNER JOIN R37FILES.FINITEM ON 
-																						R37MODSDTA.VCOITEM.ONITEM = R37FILES.FINITEM.FICITEM INNER JOIN R37FILES.VINITMB ON 
-																						R37FILES.VINITMB.IFITEM=R37FILES.FINITEM.FICITEM WHERE 
-																						(((R37MODSDTA.VCOITEM.ONCUST)='100000 ')) AND ICDEL <> 'I'")
+		@item_master = @database_handle.execute("SELECT DISTINCT #{@@library_prefix}MODSDTA.VCOITEM.ONITEM, #{@@library_prefix}MODSDTA.VCOITEM.ONCITM,
+																						#{@@library_prefix}FILES.FINITEM.FICDONATED, #{@@library_prefix}FILES.FINITEM.FICBRAND, #{@@library_prefix}FILES.VINITEM.ICDSC1, 
+																						#{@@library_prefix}FILES.VINITEM.ICWGHT,
+																						#{@@library_prefix}FILES.VINITEM.ICDEL, #{@@library_prefix}MODSDTA.VCOITEM.ONCUST, #{@@library_prefix}FILES.VINITMB.IFDROP 
+																						FROM (#{@@library_prefix}FILES.VINITEM INNER JOIN #{@@library_prefix}MODSDTA.VCOITEM ON 
+																						(#{@@library_prefix}FILES.VINITEM.ICITEM = #{@@library_prefix}MODSDTA.VCOITEM.ONITEM)) INNER JOIN #{@@library_prefix}FILES.FINITEM ON 
+																						#{@@library_prefix}MODSDTA.VCOITEM.ONITEM = #{@@library_prefix}FILES.FINITEM.FICITEM INNER JOIN #{@@library_prefix}FILES.VINITMB ON 
+																						#{@@library_prefix}FILES.VINITMB.IFITEM=#{@@library_prefix}FILES.FINITEM.FICITEM WHERE 
+																						(((#{@@library_prefix}MODSDTA.VCOITEM.ONCUST)='100000 ')) AND ICDEL <> 'I'")
 																						.fetch(:all,:Struct)
+
+		#@item_master = @database_handle.execute("SELECT DISTINCT #{@@library_prefix}MODSDTA.VCOITEM.ONITEM, #{@@library_prefix}MODSDTA.VCOITEM.ONCITM,
+		#																				#{@@library_prefix}FILES.FINITEM.FICDONATED, #{@@library_prefix}FILES.FINITEM.FICBRAND, 
+		#																				#{@@library_prefix}FILES.VINITEM.ICDSC1, #{@@library_prefix}FILES.VINITEM.ICWGHT, 
+		#																				#{@@library_prefix}FILES.VINITEM.ICDEL, #{@@library_prefix}MODSDTA.VCOITEM.ONCUST, 
+		#																				#{@@library_prefix}FILES.VINITMB.IFDROP FROM (#{@@library_prefix}FILES.VINITEM INNER JOIN 
+		#																				#{@@library_prefix}MODSDTA.VCOITEM ON (#{@@library_prefix}FILES.VINITEM.ICITEM = 
+		#																				#{@@library_prefix}MODSDTA.VCOITEM.ONITEM)) INNER JOIN #{@@library_prefix}FILES.FINITEM ON 
+		#																				#{@@library_prefix}MODSDTA.VCOITEM.ONITEM = #{@@library_prefix}FILES.FINITEM.FICITEM 
+		#																				INNER JOIN #{@@library_prefix}FILES.VINITMB ON #{@@library_prefix}FILES.VINITMB.IFITEM = 
+		#																				#{@@library_prefix}FILES.FINITEM.FICITEM WHERE 
+		#																				(((#{@@library_prefix}MODSDTA.VCOITEM.ONCUST)='100000 ')) AND ICDEL <> 'I'")
+		#																				.fetch(:all,:Struct)
 		#@item_master.each do |row|
 		#	puts "#{row}"
 		#end															
@@ -191,18 +216,13 @@ class OrderProcessor
 		return new_str
 	end
 	
-	def get_uom
-		#CS or EA
-		return "CS"
-	end
-	
-	def set_s2k_item_and_weight(cust_item, order, qty) 
+	def set_s2k_item_and_weight
 		rs = []
 		item_found = false
 		donated_count = 0
 		purchased_count = 0
 		@item_master.each do |row|
-			if row.ONCITM.strip == cust_item.strip
+			if row.ONCITM.strip == @spec_num.strip
 				if row.FICDONATED == 'Y' #and row.ICDEL != 'I'
 					donated_count += 1
 				else
@@ -221,6 +241,7 @@ class OrderProcessor
 								 :ship => @ship_to,
 								 :order => @purchase_order,
 								 :item => @spec_num,
+                 :item_dsc => @item_dsc,
 								 :qty  => @qty,
 								 :date => @delivery_date,
 								 :msg => "No Active Item Found"
@@ -234,6 +255,7 @@ class OrderProcessor
 								 		 :date => @delivery_date,
 								 		 :qty  => @qty,
 								 		 :item => @spec_num,
+                     :item_dsc => @item_dsc,
 								 		 :msg => "Too many Donated Matches"
 			end
 			
@@ -244,6 +266,7 @@ class OrderProcessor
 								 		 :date => @delivery_date,
 								 		 :qty  => @qty,
 								 		 :item => @spec_num,
+                     :item_dsc => @item_dsc,
 								 		 :msg => "Too many Purchased Matches"
 			end
 				 	
@@ -284,6 +307,7 @@ class OrderProcessor
 	
   def process
 		#Iterate through the orders (elements marked "elements")
+		puts "Process called."
 		i=0
 		@ns.each do |node| 
 			@purchase_order = node.at_xpath("order_id").content
@@ -304,13 +328,15 @@ class OrderProcessor
 			drop_ship_orderline = 0
 			node.xpath('details').each do |child|
 				@spec_num = child['item_key']
-				@qty = child['ordered_quantity']
+				@qty = child['ordered_quantity'].to_i
+				@item_dsc = child['item_name']
 				
 				#Iterate while looking for Drop Shipments
-				@item = "0" unless self.set_s2k_item_and_weight(@spec_num, @purchase_order, @qty)
-				uom =  @prefs.item_to_break(@item)
-				if uom == 'EA'
-					unless item.include? "-BC"	
+				@item = "0" unless self.set_s2k_item_and_weight
+				unit =  @prefs.item_to_break(@item)
+				#puts "uom = #{unit}"
+				if unit == 'EA'
+					unless @item.include? "-BC"	
 						@item.strip!
 						@item += "-BC"
 					end
@@ -320,10 +346,10 @@ class OrderProcessor
 					drop_ship_orderline += 1
 					@drop_ship = true
 					@writer.write_order_detail_drop_ship(@database_handle, @cust_num, @purchase_order,
-																								drop_ship_orderline, @item, @spec_num, uom, @ship_to, @qty)
+																								drop_ship_orderline, @item, @spec_num, unit, @ship_to, @qty)
 				else
 					orderline += 1
-					@writer.write_order_detail(@database_handle, @cust_num, @purchase_order, orderline, @item, @spec_num, uom, @ship_to, @qty)
+					@writer.write_order_detail(@database_handle, @cust_num, @purchase_order, orderline, @item, @spec_num, unit, @ship_to, @qty)
 				end
 			end #of details block
 			

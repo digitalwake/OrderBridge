@@ -53,28 +53,29 @@ class Preferences
 		return rs
 	end
 	
-	def item_to_break(item)
+	def item_to_break(candidate)
 		rs = self.get_items_to_break
+		#uom = ''
 		unless rs.empty? 
 			rs.each do |x|
-				if item == x
-				 	uom = 'EA'
-				else
-					uom = 'CS'
+				if candidate.strip == x.item.to_s
+					return 'EA'
 				end
 			end
 		end
-		return rs.empty? ? 'CS' : uom		
+		return 'CS'		
 	end
 	
-	def item_weight_to_qty(item, qty, weight)
+	def item_weight_to_qty(candidate, qty, weight)
 		rs = self.get_items_weight_to_qty
 		unless rs.empty?
 			rs.each do |x|
-				if item == x
-					new_qty = qty/(weight*100)
-					if qty % (weight*100) > 0
-						quantity += 1
+				if candidate.strip == x.item.to_s
+					#new_qty = qty/(weight*100)
+					new_qty = qty/(weight)
+					#if qty % (weight*100) > 0
+					if qty % (weight) > 0
+						new_qty += 1
 					end
 					qty = new_qty
 				end
